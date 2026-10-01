@@ -1,0 +1,808 @@
+<title>Care Gate Workflow Redesign</title>
+<style>
+  /* Workflow-UX proposal for Care Gate / JuliaCare — teal brand; warm "today" amber vs calm "future" green. */
+  :root {
+    --bg: #eef3f2; --surface: #ffffff; --surface-2: #f6f9f8; --surface-3: #eef4f2;
+    --ink: #08323c; --muted: #586a67;
+    --line: #d8e4e1;
+    --teal: #0e6e7e; --teal-ink: #0a5967; --teal-soft: #0e6e7e14;
+    --today: #b4530d; --today-soft: #b4530d12;
+    --future: #157a45; --future-soft: #157a4514;
+    --disp: "Bricolage Grotesque", "Trebuchet MS", sans-serif;
+    --body: "IBM Plex Sans", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --sh: 0 1px 2px #08323c0f, 0 8px 24px #08323c0a;
+    --r: 14px;
+    /* pattern colors */
+    --p-ws: #0e6e7e; --p-tab: #2563a8; --p-drawer: #7a3ea8; --p-modal: #b4530d; --p-sheet: #9a3b6a; --p-flow: #157a45; --p-bar: #4a5a6a; --p-card: #6b7280; --p-confirm: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0a1416; --surface: #0f1d20; --surface-2: #0c181a; --surface-3: #13262a;
+    --ink: #e7f0ee; --muted: #9db3af;
+    --line: #22383b;
+    --teal: #3fb3c4; --teal-ink: #7fd3df; --teal-soft: #3fb3c41f;
+    --today: #e8974e; --today-soft: #e8974e14;
+    --future: #5bc082; --future-soft: #5bc0821a;
+    --sh: 0 1px 2px #0006, 0 10px 30px #0004;
+    --p-ws:#3fb3c4; --p-tab:#6ea8e0; --p-drawer:#c08ee0; --p-modal:#e8974e; --p-sheet:#e08ab0; --p-flow:#5bc082; --p-bar:#9fb2c4; --p-card:#9aa6b2; --p-confirm:#e0b257;
+    color-scheme: dark;
+  }}
+  :root[data-theme="dark"] {
+    --bg: #0a1416; --surface: #0f1d20; --surface-2: #0c181a; --surface-3: #13262a;
+    --ink: #e7f0ee; --muted: #9db3af; --line: #22383b;
+    --teal: #3fb3c4; --teal-ink: #7fd3df; --teal-soft: #3fb3c41f;
+    --today: #e8974e; --today-soft: #e8974e14; --future: #5bc082; --future-soft: #5bc0821a;
+    --sh: 0 1px 2px #0006, 0 10px 30px #0004;
+    --p-ws:#3fb3c4; --p-tab:#6ea8e0; --p-drawer:#c08ee0; --p-modal:#e8974e; --p-sheet:#e08ab0; --p-flow:#5bc082; --p-bar:#9fb2c4; --p-card:#9aa6b2; --p-confirm:#e0b257;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding-inline: 20px; }
+  @media (max-width: 480px){ .wrap { padding-inline: 14px; } }
+  h1,h2,h3,h4 { font-family: var(--disp); font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  p { margin: 0; }
+  .eyebrow { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--teal); font-weight: 600; }
+
+  header.top { border-bottom: 1px solid var(--line); background: linear-gradient(180deg, var(--surface), var(--surface-2)); }
+  .top-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { inline-size: 38px; block-size: 38px; border-radius: 10px; background: var(--teal); color: #fff; display: grid; place-items: center; font-family: var(--disp); font-weight: 700; font-size: 17px; }
+  .brand b { font-family: var(--disp); font-size: 16px; display:block; }
+  .brand small { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+  .tgl { border: 1px solid var(--line); background: var(--surface); color: var(--ink); font-family: var(--mono); font-size: 12px; border-radius: 999px; padding: 7px 13px; cursor: pointer; }
+
+  .hero { padding-block: 30px 10px; }
+  .hero h1 { font-size: clamp(26px, 5vw, 40px); line-height: 1.05; }
+  .hero .lede { color: var(--muted); font-size: clamp(15px, 2vw, 17px); max-width: 72ch; margin-top: 12px; }
+
+  /* Tabs */
+  .tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); margin-top: 20px; }
+  .tabs-in { display: flex; gap: 6px; padding-block: 10px; flex-wrap: wrap; }
+  .tab-btn { border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-family: var(--disp); font-weight: 650; font-size: 14px; border-radius: 10px; padding: 9px 15px; cursor: pointer; display:flex; align-items:center; gap:8px; }
+  .tab-btn .b { font-family: var(--mono); font-size: 11px; background: var(--surface-3); color: var(--muted); border-radius: 999px; padding: 1px 7px; }
+  .tab-btn[aria-selected="true"] { background: var(--teal); color: #fff; border-color: var(--teal); }
+  .tab-btn[aria-selected="true"] .b { background: #ffffff2e; color: #fff; }
+
+  .panelw { padding-block: 26px 10px; }
+  [role="tabpanel"][hidden] { display: none; }
+
+  h2.sec { font-size: clamp(20px, 3.5vw, 26px); }
+  .sub { color: var(--muted); max-width: 74ch; margin-top: 8px; font-size: 14px; }
+
+  /* coverage summary cards */
+  .cov { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin: 20px 0 8px; }
+  .cov .c { background: var(--surface); border:1px solid var(--line); border-radius: var(--r); padding: 14px 16px; box-shadow: var(--sh); }
+  .cov .c .n { font-family: var(--disp); font-size: 26px; font-weight: 700; }
+  .cov .c .n .ok { color: var(--future); font-size:15px; }
+  .cov .c .k { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+  /* app group */
+  .appgrp { margin-top: 26px; }
+  .appgrp > h3 { font-size: 18px; display:flex; align-items:center; gap:10px; }
+  .appgrp > h3 .pill { margin-inline-start:auto; font-family:var(--mono); font-size:11.5px; color:var(--muted); font-weight:500; }
+  .ic { inline-size: 32px; block-size: 32px; border-radius: 9px; display: grid; place-items: center; font-size: 16px; background: var(--teal-soft); color: var(--teal); }
+
+  .tblwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; margin-top: 12px; box-shadow: var(--sh); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
+  thead th { text-align: start; font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 10px 14px; background: var(--surface-2); border-bottom: 1px solid var(--line); position: sticky; top: 0; }
+  tbody td { padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--surface-2); }
+  td.fn { font-weight: 600; color: var(--ink); white-space: nowrap; }
+  td.sub2 { color: var(--muted); }
+  .grouprow td { background: var(--teal-soft); font-family: var(--disp); font-weight: 700; color: var(--teal-ink); font-size: 13px; }
+  .ck { color: var(--future); font-weight: 700; }
+
+  /* pattern chips */
+  .pat { font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing:.02em; border-radius: 7px; padding: 3px 8px; white-space: nowrap; display: inline-block; border:1px solid transparent; }
+  .pat.ws { color: var(--p-ws); background: color-mix(in srgb, var(--p-ws) 12%, transparent); }
+  .pat.tab { color: var(--p-tab); background: color-mix(in srgb, var(--p-tab) 12%, transparent); }
+  .pat.drawer { color: var(--p-drawer); background: color-mix(in srgb, var(--p-drawer) 12%, transparent); }
+  .pat.modal { color: var(--p-modal); background: color-mix(in srgb, var(--p-modal) 12%, transparent); }
+  .pat.sheet { color: var(--p-sheet); background: color-mix(in srgb, var(--p-sheet) 12%, transparent); }
+  .pat.flow { color: var(--p-flow); background: color-mix(in srgb, var(--p-flow) 12%, transparent); }
+  .pat.bar { color: var(--p-bar); background: color-mix(in srgb, var(--p-bar) 16%, transparent); }
+  .pat.card { color: var(--p-card); background: color-mix(in srgb, var(--p-card) 16%, transparent); }
+  .pat.confirm { color: var(--p-confirm); background: color-mix(in srgb, var(--p-confirm) 14%, transparent); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 6px; }
+  .legend .l { display:flex; align-items:center; gap:7px; font-size:12px; color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:5px 11px; }
+
+  /* Development tracker */
+  :root { --s-todo:#7b8a87; --s-doing:#2563a8; --s-review:#8a5a00; --s-blocked:#b3261e; --s-done:#157a45; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --s-todo:#9db3af; --s-doing:#6ea8e0; --s-review:#e0b257; --s-blocked:#f08a82; --s-done:#5bc082; } }
+  :root[data-theme="dark"] { --s-todo:#9db3af; --s-doing:#6ea8e0; --s-review:#e0b257; --s-blocked:#f08a82; --s-done:#5bc082; }
+  .trk-ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+  .trk-ctl label { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .trk-ctl .grow { flex: 1; }
+  select, input.own { font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; min-width: 0; }
+  select:focus-visible, input.own:focus-visible, .tgl:focus-visible, .tab-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .phase { margin-top: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--sh); overflow: hidden; }
+  .phase-h { display: flex; align-items: center; gap: 14px; padding: 14px 18px; background: var(--surface-2); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .phase-h .pid { font-family: var(--mono); font-size: 11px; font-weight: 600; color: #fff; background: var(--teal); border-radius: 7px; padding: 3px 8px; }
+  .phase-h h3 { font-size: 16px; }
+  .phase-h .goal { color: var(--muted); font-size: 12.5px; flex-basis: 100%; }
+  .phase-h .meta { margin-inline-start: auto; font-family: var(--mono); font-size: 11.5px; color: var(--muted); text-align: end; }
+  .progress { block-size: 6px; background: var(--surface-3); }
+  .progress > i { display: block; block-size: 100%; background: var(--s-done); inline-size: 0; transition: inline-size .25s; }
+  .task { display: grid; grid-template-columns: 1fr 120px 150px; gap: 10px 14px; align-items: center; padding: 11px 18px; border-bottom: 1px solid var(--line); }
+  .task:last-child { border-bottom: 0; }
+  .task .tt { min-width: 0; }
+  .task .tt b { font-size: 13.5px; font-weight: 600; }
+  .task .tt .m { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; align-items: center; }
+  .task .tnote { margin: 5px 0 0; font-size: 12.5px; color: var(--muted); max-width: 75ch; }
+  .task .id { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  .app-tag { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; border-radius: 6px; padding: 2px 7px; background: var(--teal-soft); color: var(--teal-ink); }
+  .est { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  .st { font-weight: 600; border-inline-start: 4px solid var(--s-todo); padding-inline-start: 6px; }
+  .task[data-s="doing"] .st { border-color: var(--s-doing); color: var(--s-doing); }
+  .task[data-s="review"] .st { border-color: var(--s-review); color: var(--s-review); }
+  .task[data-s="blocked"] .st { border-color: var(--s-blocked); color: var(--s-blocked); }
+  .task[data-s="done"] .st { border-color: var(--s-done); color: var(--s-done); }
+  .task[data-s="done"] .tt b { text-decoration: line-through; text-decoration-color: var(--muted); color: var(--muted); }
+  .task select, .task input.own { inline-size: 100%; }
+  @media (max-width: 720px) { .task { grid-template-columns: 1fr 1fr; } .task .tt { grid-column: 1 / -1; } }
+  .cov .c .n.s-done { color: var(--s-done); } .cov .c .n.s-doing { color: var(--s-doing); } .cov .c .n.s-blocked { color: var(--s-blocked); } .cov .c .n.s-review { color: var(--s-review); }
+  code { font-family: var(--mono); font-size: 12px; background: var(--surface-3); border-radius: 5px; padding: 1px 5px; }
+
+  .note { background: var(--surface-2); border: 1px solid var(--line); border-inline-start: 3px solid var(--teal); border-radius: 10px; padding: 13px 15px; margin-top: 20px; color: var(--muted); font-size: 13px; }
+  .note b { color: var(--ink); }
+  footer { padding-block: 26px 48px; color: var(--muted); font-size: 12px; }
+  footer .wrap { border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand"><div class="logo">CG</div><div><b>Care Gate · Workflow Redesign</b><small>coverage audit + implementation plan</small></div></div>
+    <button class="tgl" id="tgl" type="button" aria-label="Toggle theme">◐ Theme</button>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <p class="eyebrow">UX direction · all functions accounted for</p>
+  <h1>Every function, mapped to a workflow — and how each one is built.</h1>
+  <p class="lede">The same direction as before: collapse the 126 live menu entries across the three apps (72 web, 19 doctor, 35 patient) into role workspaces with inline actions. These three tabs make it accountable — <b>Coverage</b> proves nothing is dropped, <b>Implementation</b> says exactly what each screen becomes (a workspace, a tab, a right drawer, a modal, a bottom sheet, a guided flow or a persistent bar), and the <b>Development Tracker</b> sequences the work into phases you can update as it ships.</p>
+</div>
+
+<div class="tabs">
+  <div class="wrap tabs-in" role="tablist" aria-label="Views">
+    <button class="tab-btn" id="t-cov" role="tab" aria-selected="true" aria-controls="p-cov">✓ Functional Coverage Audit <span class="b">126 routes</span></button>
+    <button class="tab-btn" id="t-impl" role="tab" aria-selected="false" aria-controls="p-impl">▦ Implementation Plan <span class="b">patterns</span></button>
+    <button class="tab-btn" id="t-dev" role="tab" aria-selected="false" aria-controls="p-dev">◔ Development Tracker <span class="b" id="devbadge">0%</span></button>
+  </div>
+</div>
+
+<!-- ============================= TAB 1: COVERAGE ============================= -->
+<div class="wrap panelw" id="p-cov" role="tabpanel" aria-labelledby="t-cov">
+  <h2 class="sec">Functional coverage audit</h2>
+  <p class="sub">Every live menu entry in each app, plus the key screens that are not menu entries, folded into its future workspace. Grouped by the destination workspace so you can see the whole workspace at a glance — and confirm every current function has a home. <b>0 orphaned</b>, and that is now enforced by a test, not just claimed.</p>
+
+  <div class="cov">
+    <div class="c"><div class="n">126 <span class="ok">✓</span></div><div class="k">Live menu entries, each placed in a workspace</div></div>
+    <div class="c"><div class="n">17</div><div class="k">Workspaces defined (10 web, 3 doctor, 4 patient)</div></div>
+    <div class="c"><div class="n">0</div><div class="k">Unplaced (a test fails if this changes)</div></div>
+    <div class="c"><div class="n">3</div><div class="k">Apps covered</div></div>
+  </div>
+
+  <!-- PATIENT -->
+  <div class="appgrp">
+    <h3><span class="ic">🩺</span> Patient app <span class="pill">35 menu entries → 3 intents + onboarding</span></h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Today function</th><th>Folded into</th><th>✓</th></tr></thead>
+      <tbody>
+        <tr class="grouprow"><td colspan="3">Get care — one guided flow</td></tr>
+        <tr><td class="fn">Home</td><td class="sub2">“Get care” landing + quick status</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Book Appointment</td><td class="sub2">Get-care flow (path: schedule)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Choose a Time (slots)</td><td class="sub2">Step in booking flow</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Urgent consultation</td><td class="sub2">Get-care flow (path: now)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Waiting for a Clinician</td><td class="sub2">Flow state after “urgent”</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Find a Doctor</td><td class="sub2">Get-care flow (path: by doctor)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Talk to Someone (MHPSS)</td><td class="sub2">Get-care flow (path: counselling)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Choose Session Type</td><td class="sub2">Step in counselling path</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Tell Us How You Feel (symptom check)</td><td class="sub2">First step of the flow; attaches to visit</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Suggested Clinicians (match)</td><td class="sub2">Step in the flow</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">You Are Being Seen Urgently</td><td class="sub2">Flow state</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">My care — one health timeline (tabs)</td></tr>
+        <tr><td class="fn">My Visits</td><td class="sub2">My care · Visits tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Messages</td><td class="sub2">My care · Messages (+ bottom-bar)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Certificates</td><td class="sub2">My care · Certificates tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Referrals</td><td class="sub2">My care · Referrals tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Bills / Payment Result</td><td class="sub2">My care · Bills tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Health Records</td><td class="sub2">My care · Records tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Conditions</td><td class="sub2">Records · Conditions</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Vitals</td><td class="sub2">Records · Vitals</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Device Readings</td><td class="sub2">Records · Readings</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Documents</td><td class="sub2">Records · Documents</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Upload a Report</td><td class="sub2">Action inside Documents</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">Me &amp; family — account &amp; privacy</td></tr>
+        <tr><td class="fn">My Profile</td><td class="sub2">Me · Profile</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Family &amp; Who You’re Helping</td><td class="sub2">Me · Family (+ top switcher)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Consents</td><td class="sub2">Me · Consents</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Telemedicine Consent</td><td class="sub2">Me · Consents</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Contacts</td><td class="sub2">Me · Contacts</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">How We Contact You</td><td class="sub2">Me · Notifications</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Who Viewed My Record</td><td class="sub2">Me · Privacy</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Accessibility</td><td class="sub2">Me · Accessibility</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Change Password</td><td class="sub2">Me · Security</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Raise a Complaint / My Complaints</td><td class="sub2">Me · Help &amp; complaints</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Help &amp; Support</td><td class="sub2">Me · Help</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Create Account / Complete Registration</td><td class="sub2">Onboarding guided flow</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Delete My Account</td><td class="sub2">Me · Security (danger)</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">The consult (call)</td></tr>
+        <tr><td class="fn">Consultation room (video/voice/chat)</td><td class="sub2">Call workspace</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Group voice (care team)</td><td class="sub2">Overlay on the call</td><td class="ck">✓</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- DOCTOR -->
+  <div class="appgrp">
+    <h3><span class="ic">👨‍⚕️</span> Doctor app <span class="pill">~19 functions → Worklist · Consult · Me</span></h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Today function</th><th>Folded into</th><th>✓</th></tr></thead>
+      <tbody>
+        <tr class="grouprow"><td colspan="3">The Worklist — one unified queue (lanes)</td></tr>
+        <tr><td class="fn">My Day</td><td class="sub2">Worklist · Today lane (default)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Caseload</td><td class="sub2">Worklist · My patients lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Consultations</td><td class="sub2">Worklist · Consults lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Emergency Queue</td><td class="sub2">Worklist · Emergency lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">MHPSS Queue</td><td class="sub2">Worklist · MHPSS lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Readings for Review</td><td class="sub2">Worklist · To review lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Referrals</td><td class="sub2">Worklist · Referrals lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Message Inbox</td><td class="sub2">Worklist · Messages lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Patients</td><td class="sub2">Worklist search → patient/consult</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">The Consult workspace (tabs on one patient)</td></tr>
+        <tr><td class="fn">Consultation room + Case 360</td><td class="sub2">Consult workspace spine</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Case sheet</td><td class="sub2">Consult · Notes tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Diagnosis</td><td class="sub2">Consult · Diagnosis tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Prescriptions</td><td class="sub2">Consult · Rx tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Medical Certificate</td><td class="sub2">Consult · Certificate tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Record vitals</td><td class="sub2">Consult · Vitals tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Care team / Refer</td><td class="sub2">Consult · side drawer/overlay</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">Me — practice settings</td></tr>
+        <tr><td class="fn">My Availability</td><td class="sub2">Me · Availability</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Leave &amp; Exceptions</td><td class="sub2">Me · Availability (leave)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Devices</td><td class="sub2">Me · Devices</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Licence</td><td class="sub2">Me · Licence</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Profile</td><td class="sub2">Me · Profile</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Ratings</td><td class="sub2">Me · Performance</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">My Statistics</td><td class="sub2">Me · Performance</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Sync Status / Sync Conflicts</td><td class="sub2">Me · status card (badge when issues)</td><td class="ck">✓</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- WEB -->
+  <div class="appgrp">
+    <h3><span class="ic">🗂️</span> Web / admin console <span class="pill">72 menu entries → 9 workspaces</span></h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Today function</th><th>Folded into</th><th>✓</th></tr></thead>
+      <tbody>
+        <tr class="grouprow"><td colspan="3">🏥 Front Desk workspace</td></tr>
+        <tr><td class="fn">Patient Search</td><td class="sub2">Front Desk worklist (spine)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Register Patient</td><td class="sub2">Inline create on the worklist</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Merge Duplicate Patients</td><td class="sub2">Action on a patient</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Book Appointment</td><td class="sub2">Action on patient card</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Create Bill</td><td class="sub2">Action on patient card</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Receipts</td><td class="sub2">Patient card · payments</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Payments</td><td class="sub2">Action on a bill</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Outstanding Bills</td><td class="sub2">Front Desk / Finance lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Open / Close Shift</td><td class="sub2">Persistent cashier bar</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Day-End Collection</td><td class="sub2">Cashier bar · day-end</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">🩺 Clinical workspace</td></tr>
+        <tr><td class="fn">Clinical</td><td class="sub2">Clinical workspace (patient 360 spine)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Consultations</td><td class="sub2">On patient · Consults</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Triage</td><td class="sub2">Clinical · Triage lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Match Review</td><td class="sub2">Clinical · Triage (action)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Rule Approvals</td><td class="sub2">Clinical · Triage (approve)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Prescriptions</td><td class="sub2">On patient · Rx</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Medical Certificates</td><td class="sub2">On patient · Certificates</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Verify a Certificate</td><td class="sub2">Quick action + public verify page</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Patient Record Activity</td><td class="sub2">On patient · Activity</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">📅 Scheduling &amp; queues workspace</td></tr>
+        <tr><td class="fn">Scheduling</td><td class="sub2">Scheduling workspace (calendar)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Appointments</td><td class="sub2">Scheduling · Appointments lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Emergency Queue</td><td class="sub2">Scheduling · live queue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">MHPSS Oversight</td><td class="sub2">Scheduling · MHPSS queue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Reminder Rules</td><td class="sub2">Setup (referenced here)</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">💳 Finance workspace</td></tr>
+        <tr><td class="fn">Billing (existing hub)</td><td class="sub2">Finance landing: BillingWorkspace already exists</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Bills</td><td class="sub2">Finance worklist</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Outstanding Bills</td><td class="sub2">Finance · overdue lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Receipts</td><td class="sub2">Finance · receipts lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Payments</td><td class="sub2">Finance · payments lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Refunds</td><td class="sub2">Finance · refunds lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Refund Request</td><td class="sub2">Action on a payment</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Gateway Reconciliation</td><td class="sub2">Finance · reconcile tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Day-End Collection</td><td class="sub2">Finance · day-end</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">🛡️ Care Quality &amp; Safeguarding workspace</td></tr>
+        <tr><td class="fn">Quality &amp; Feedback</td><td class="sub2">Quality workspace (landing)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Complaints</td><td class="sub2">Quality · Complaints lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Feedback Moderation</td><td class="sub2">Quality · Feedback lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Safeguarding Queue</td><td class="sub2">Quality · Safeguarding lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Safeguarding Reports</td><td class="sub2">Quality · Reports tab</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">↗️ Referrals workspace</td></tr>
+        <tr><td class="fn">Referrals</td><td class="sub2">Referrals workspace</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Referral Inbox</td><td class="sub2">Referrals · inbox (default)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Unanswered Referrals</td><td class="sub2">Referrals · SLA filter (top)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Referral Response Rules</td><td class="sub2">Setup</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">🔐 Governance &amp; Security workspace</td></tr>
+        <tr><td class="fn">Roles &amp; Permissions</td><td class="sub2">Governance · Roles</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Access Matrix</td><td class="sub2">Governance · Roles (matrix view)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">User Accounts</td><td class="sub2">Governance · Users worklist</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Account Verification</td><td class="sub2">Governance · Users (verify lane)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Account Deletion Requests</td><td class="sub2">Governance · requests lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Security Alerts</td><td class="sub2">Governance · Alerts lane</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Active Sessions</td><td class="sub2">Governance · Sessions tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Audit / Record History</td><td class="sub2">Governance · Audit tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Retention &amp; Archival</td><td class="sub2">Governance · Retention tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Encryption Key Registry</td><td class="sub2">Governance · Keys tab · <i>hidden in the menu today</i></td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Registered Devices</td><td class="sub2">Governance · Devices tab</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">📊 Insights workspace</td></tr>
+        <tr><td class="fn">Dashboard</td><td class="sub2">Insights landing</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Hub &amp; Spoke Overview</td><td class="sub2">Insights · Hub &amp; Spoke tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">M&amp;E Report</td><td class="sub2">Insights · M&amp;E tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Call Quality</td><td class="sub2">Insights · Call Quality tab</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Report Catalogue</td><td class="sub2">Insights · Reports tab · <i>hidden in the menu today</i></td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Report History</td><td class="sub2">Insights · Reports (history)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Notification Delivery</td><td class="sub2">Insights · health card</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">SMS Fallback Log</td><td class="sub2">Insights · health card</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Sync Monitor</td><td class="sub2">Insights · health card</td><td class="ck">✓</td></tr>
+        <tr class="grouprow"><td colspan="3">⚙️ Setup (configuration — off the daily path)</td></tr>
+        <tr><td class="fn">Clinicians</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Facilities</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Governorates</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Specialities</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Medicine Master</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">ICD Catalogue</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Services &amp; Tariffs</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Diagnostic Devices</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Clinical Templates</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Licence Register</td><td class="sub2">Setup · catalogue</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Content &amp; Translations</td><td class="sub2">Setup · Localisation · <i>hidden in the menu today</i></td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Languages</td><td class="sub2">Setup · Localisation · <i>hidden in the menu today</i></td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Translatable fields</td><td class="sub2">Setup · Localisation · <i>hidden in the menu today</i></td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Translation Gaps / Coverage</td><td class="sub2">Setup · Localisation (health) · <i>hidden in the menu today</i></td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Policies &amp; Consent Text</td><td class="sub2">Setup · Policies</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Reminder Rules</td><td class="sub2">Setup · Rules</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Referral Response Rules</td><td class="sub2">Setup · Rules</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Settings &amp; Feature Flags</td><td class="sub2">Setup · Flags</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Change Password</td><td class="sub2">Avatar menu (all roles)</td><td class="ck">✓</td></tr>
+        <tr><td class="fn">Notifications (bell)</td><td class="sub2">Persistent top bar (all workspaces)</td><td class="ck">✓</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="note"><b>Nothing is removed.</b> Every current function keeps its capability — it just moves from a standalone menu to a position inside the workspace where that work actually happens. Where a function serves two jobs (e.g. Outstanding Bills for both Front Desk and Finance), it appears in both, reading the same data.</div>
+</div>
+
+<!-- ============================= TAB 2: IMPLEMENTATION ============================= -->
+<div class="wrap panelw" id="p-impl" role="tabpanel" aria-labelledby="t-impl" hidden>
+  <h2 class="sec">Implementation plan — what each page becomes</h2>
+  <p class="sub">The UI pattern each current page converts to. The goal is to keep the user on one surface: a page is a full <b>workspace</b> only when it's a landing; most “screens” become a <b>tab</b>, a <b>right drawer</b>, a <b>modal</b>, a <b>bottom sheet</b>, a step in a <b>guided flow</b>, or a <b>persistent bar</b>.</p>
+
+  <div class="legend">
+    <span class="l"><span class="pat ws">WORKSPACE</span> role landing (full page)</span>
+    <span class="l"><span class="pat tab">TAB</span> section inside a workspace/object</span>
+    <span class="l"><span class="pat drawer">DRAWER</span> slide-in right pane</span>
+    <span class="l"><span class="pat modal">MODAL</span> focused create/edit overlay</span>
+    <span class="l"><span class="pat sheet">SHEET</span> mobile bottom sheet</span>
+    <span class="l"><span class="pat flow">FLOW</span> multi-step wizard, one surface</span>
+    <span class="l"><span class="pat bar">BAR</span> persistent action bar</span>
+    <span class="l"><span class="pat card">CARD</span> status card, drill-in on demand</span>
+    <span class="l"><span class="pat confirm">CONFIRM</span> inline confirm, no page</span>
+  </div>
+
+  <!-- PATIENT impl -->
+  <div class="appgrp">
+    <h3><span class="ic">🩺</span> Patient app</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Function</th><th>Becomes</th><th>How it behaves</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">Get care (Book / Urgent / Find / Talk)</td><td><span class="pat flow">FLOW</span></td><td class="sub2">One guided wizard with a path chooser; progress trail; no page hops.</td></tr>
+        <tr><td class="fn">Symptom check (intake)</td><td><span class="pat flow">FLOW</span></td><td class="sub2">First step; result attaches to the booked visit automatically.</td></tr>
+        <tr><td class="fn">Choose a time (slots)</td><td><span class="pat flow">FLOW</span></td><td class="sub2">Inline step; calendar/slot picker within the flow.</td></tr>
+        <tr><td class="fn">My care (Visits/Records/Bills/Rx/Certs/Referrals)</td><td><span class="pat ws">WORKSPACE</span> <span class="pat tab">TAB</span></td><td class="sub2">One hub; each area a tab, lazy-loaded; no separate menus.</td></tr>
+        <tr><td class="fn">Upload a report</td><td><span class="pat sheet">SHEET</span></td><td class="sub2">Bottom sheet from Documents; file picker inline.</td></tr>
+        <tr><td class="fn">Pay a bill</td><td><span class="pat flow">FLOW</span></td><td class="sub2">Short pay flow/sheet from the Bills tab.</td></tr>
+        <tr><td class="fn">Me &amp; family (profile/consents/privacy/contacts)</td><td><span class="pat ws">WORKSPACE</span> <span class="pat tab">TAB</span></td><td class="sub2">Settings surface off the avatar; sections, not menus.</td></tr>
+        <tr><td class="fn">Family switch</td><td><span class="pat sheet">SHEET</span></td><td class="sub2">“Acting for” switcher in a sheet; add member = modal.</td></tr>
+        <tr><td class="fn">Grant consent / telemedicine</td><td><span class="pat modal">MODAL</span></td><td class="sub2">Consent dialog with accept; recorded inline.</td></tr>
+        <tr><td class="fn">Change password / Delete account</td><td><span class="pat modal">MODAL</span></td><td class="sub2">Focused dialog; delete is a two-step danger confirm.</td></tr>
+        <tr><td class="fn">Raise a complaint</td><td><span class="pat sheet">SHEET</span></td><td class="sub2">Compose sheet; “My complaints” is a list in Help.</td></tr>
+        <tr><td class="fn">Onboarding (create/complete registration)</td><td><span class="pat flow">FLOW</span></td><td class="sub2">Stepped sign-up, including the minor/guardian branch.</td></tr>
+        <tr><td class="fn">Consult call + care team</td><td><span class="pat ws">WORKSPACE</span> <span class="pat drawer">DRAWER</span></td><td class="sub2">Call is its own surface; care team/group voice as overlays.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- DOCTOR impl -->
+  <div class="appgrp">
+    <h3><span class="ic">👨‍⚕️</span> Doctor app</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Function</th><th>Becomes</th><th>How it behaves</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">My Day / Caseload / Consultations / Emergency / MHPSS / Readings / Referrals / Messages</td><td><span class="pat ws">WORKSPACE</span> <span class="pat tab">TAB</span></td><td class="sub2">One Worklist; each queue a filter/lane; counts as badges.</td></tr>
+        <tr><td class="fn">Open an item</td><td><span class="pat drawer">DRAWER</span></td><td class="sub2">Quick peek in a right pane; “Open” expands to the workspace.</td></tr>
+        <tr><td class="fn">Consult (360 / notes / Dx / Rx / cert / vitals)</td><td><span class="pat ws">WORKSPACE</span> <span class="pat tab">TAB</span></td><td class="sub2">One patient workspace; clinical actions as tabs, no exits.</td></tr>
+        <tr><td class="fn">Care team / Refer</td><td><span class="pat drawer">DRAWER</span></td><td class="sub2">Side drawer over the consult (as built); call stays live.</td></tr>
+        <tr><td class="fn">Prescribe / Certificate / Diagnosis save</td><td><span class="pat tab">TAB</span> <span class="pat confirm">CONFIRM</span></td><td class="sub2">Edit in the tab; “Issue/Sign” is an inline confirm.</td></tr>
+        <tr><td class="fn">Availability / Leave</td><td><span class="pat tab">TAB</span> <span class="pat drawer">DRAWER</span></td><td class="sub2">Me · Availability; edit a day in a drawer.</td></tr>
+        <tr><td class="fn">Devices / Licence / Profile / Ratings / Stats</td><td><span class="pat tab">TAB</span></td><td class="sub2">Me area sections.</td></tr>
+        <tr><td class="fn">Sync status / conflicts</td><td><span class="pat card">CARD</span></td><td class="sub2">Status card in Me; badge only when action needed.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- WEB impl -->
+  <div class="appgrp">
+    <h3><span class="ic">🗂️</span> Web / admin console</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Function</th><th>Becomes</th><th>How it behaves</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">Patient Search / Clinical / Scheduling / Finance / Quality / Referrals / Governance / Insights</td><td><span class="pat ws">WORKSPACE</span></td><td class="sub2">The 8 role landings — each a worklist, not a menu.</td></tr>
+        <tr><td class="fn">Register Patient</td><td><span class="pat modal">MODAL</span> <span class="pat flow">FLOW</span></td><td class="sub2">Dialog for quick add; guided flow for the full record.</td></tr>
+        <tr><td class="fn">Merge Duplicate Patients</td><td><span class="pat modal">MODAL</span></td><td class="sub2">Pick-two + compare dialog with confirm.</td></tr>
+        <tr><td class="fn">Book Appointment</td><td><span class="pat drawer">DRAWER</span></td><td class="sub2">Right pane on the patient card; slot picker inline.</td></tr>
+        <tr><td class="fn">Create Bill / Take Payment / Refund request</td><td><span class="pat drawer">DRAWER</span></td><td class="sub2">Right pane on the patient/bill; no navigation away.</td></tr>
+        <tr><td class="fn">Receipts / Payments / Refunds / Reconciliation</td><td><span class="pat tab">TAB</span></td><td class="sub2">Finance lanes; each row expands/acts inline.</td></tr>
+        <tr><td class="fn">Open / Close Shift · Day-End</td><td><span class="pat bar">BAR</span></td><td class="sub2">Persistent cashier bar; day-end summary in a modal.</td></tr>
+        <tr><td class="fn">Triage / Match Review / Rule Approvals</td><td><span class="pat tab">TAB</span> <span class="pat drawer">DRAWER</span> <span class="pat confirm">CONFIRM</span></td><td class="sub2">Triage lane; review in a drawer; approve = confirm.</td></tr>
+        <tr><td class="fn">Appointments / Emergency / MHPSS queues</td><td><span class="pat tab">TAB</span></td><td class="sub2">Scheduling lanes; reschedule/escalate in a drawer.</td></tr>
+        <tr><td class="fn">Complaints / Feedback / Safeguarding</td><td><span class="pat tab">TAB</span> <span class="pat drawer">DRAWER</span></td><td class="sub2">Quality lanes; assign/respond/set-status in a drawer.</td></tr>
+        <tr><td class="fn">Referral inbox / respond</td><td><span class="pat ws">WORKSPACE</span> <span class="pat drawer">DRAWER</span></td><td class="sub2">Inbox worklist; respond in a side pane.</td></tr>
+        <tr><td class="fn">Users / Roles / Access matrix</td><td><span class="pat tab">TAB</span> <span class="pat drawer">DRAWER</span></td><td class="sub2">Users worklist; edit roles/permissions in a drawer.</td></tr>
+        <tr><td class="fn">Security Alerts / Verification / Deletion requests</td><td><span class="pat tab">TAB</span> <span class="pat confirm">CONFIRM</span></td><td class="sub2">Governance lanes; ack/approve/unlock = inline actions.</td></tr>
+        <tr><td class="fn">Audit / Sessions / Record history / Keys / Devices</td><td><span class="pat tab">TAB</span></td><td class="sub2">Read-only reference tabs in Governance.</td></tr>
+        <tr><td class="fn">Retention run / Report run</td><td><span class="pat modal">MODAL</span></td><td class="sub2">Run dialog with scope + confirm; result as toast/card.</td></tr>
+        <tr><td class="fn">Dashboard / Hub&amp;Spoke / M&amp;E / Call Quality / Reports</td><td><span class="pat ws">WORKSPACE</span> <span class="pat tab">TAB</span></td><td class="sub2">Insights landing with tabbed reports.</td></tr>
+        <tr><td class="fn">Delivery / SMS fallback / Sync monitor</td><td><span class="pat card">CARD</span></td><td class="sub2">Health cards on Insights; drill into a tab on click.</td></tr>
+        <tr><td class="fn">Master data (10 catalogues)</td><td><span class="pat ws">WORKSPACE</span> <span class="pat modal">MODAL</span></td><td class="sub2">Setup catalogue list; add/edit each item in a modal.</td></tr>
+        <tr><td class="fn">Localisation / Policies / Rules / Feature flags</td><td><span class="pat tab">TAB</span> <span class="pat confirm">CONFIRM</span></td><td class="sub2">Setup tabs; flags toggle inline; policy text in a modal.</td></tr>
+        <tr><td class="fn">Verify a Certificate</td><td><span class="pat modal">MODAL</span></td><td class="sub2">Quick-verify dialog + a standalone public verify page.</td></tr>
+        <tr><td class="fn">Notifications</td><td><span class="pat bar">BAR</span></td><td class="sub2">Bell in the top bar; panel drops from it.</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="note"><b>Rule of thumb:</b> a current page stays a full page only if it's a role's <i>landing</i> or a standalone object (the call, a public verify link). Everything a user does <i>to</i> a row — edit, book, bill, approve, respond, set status — becomes a drawer, modal or inline confirm so they never lose their place in the list.</div>
+
+  <div class="appgrp">
+    <h3>Rollout order</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Step</th><th>What</th><th>Risk</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">1 · Regroup</td><td class="sub2">Re-nest today's menus into the workspaces + Setup. No new screens.</td><td><span class="pat flow">LOW</span></td></tr>
+        <tr><td class="fn">2 · Worklist home</td><td class="sub2">Each role lands on its queue; reuse existing lists.</td><td><span class="pat tab">LOW–MED</span></td></tr>
+        <tr><td class="fn">3 · Inline actions</td><td class="sub2">Convert top repeated paths to drawers/modals (reception billing, clinician write-up).</td><td><span class="pat drawer">MED</span></td></tr>
+        <tr><td class="fn">4 · Guided flows</td><td class="sub2">Booking, registration, triage→consult as single flows; measure transition drop.</td><td><span class="pat modal">MED</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ============================= TAB 3: DEVELOPMENT TRACKER ============================= -->
+<div class="wrap panelw" id="p-dev" role="tabpanel" aria-labelledby="t-dev" hidden>
+  <h2 class="sec">Development plan &amp; tracker</h2>
+  <p class="sub">Six phases, ordered so every phase ships something usable and the risky work (inline actions, guided flows) comes after the low-risk regrouping. Set a status and owner on each task; progress rolls up per phase and overall. Estimates are working days for one developer and are meant for sequencing, not commitment.</p>
+
+  <div class="cov" id="sumcards"></div>
+
+  <div class="trk-ctl">
+    <label for="f-app">App</label>
+    <select id="f-app"><option value="">All apps</option><option>Patient</option><option>Doctor</option><option>Web</option><option>All</option></select>
+    <label for="f-st">Status</label>
+    <select id="f-st"><option value="">Any status</option><option value="todo">Not started</option><option value="doing">In progress</option><option value="review">In review</option><option value="blocked">Blocked</option><option value="done">Done</option></select>
+    <span class="grow"></span>
+    <button class="tgl" id="b-copy" type="button">Copy status summary</button>
+    <button class="tgl" id="b-reset" type="button">Reset to file status</button>
+  </div>
+  <div id="copybox" hidden style="margin-top:10px"><label for="copyta" class="sub" style="display:block;margin:0 0 6px">Select and copy:</label><textarea id="copyta" rows="8" style="width:100%;font-family:var(--mono);font-size:12px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:10px"></textarea></div>
+  <p class="sub" id="savenote" style="font-size:12px">Status comes from this file and is updated as work lands. Changes you make here are local to this browser.</p>
+
+  <div id="phases"></div>
+
+  <div class="appgrp">
+    <h3>Findings from the code (these change the plan)</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Finding</th><th>Evidence</th><th>Effect on the plan</th></tr></thead>
+      <tbody id="findings"></tbody>
+    </table></div>
+  </div>
+
+  <div class="appgrp">
+    <h3>Progress log</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th style="width:110px">Date</th><th>What landed</th></tr></thead>
+      <tbody id="progresslog"></tbody>
+    </table></div>
+    <p class="sub" style="font-size:12px">This file is the source of truth for status. It is updated as work lands; the dropdowns below let you override a status in your own browser, shown with a dot, and “Reset to file status” clears your overrides.</p>
+  </div>
+
+  <div class="appgrp">
+    <h3>Dependencies &amp; risks to manage</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Item</th><th>Why it matters</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">Menus are generated from the plan DB</td><td class="sub2">Re-nesting the menus in code is undone by the next regeneration.</td><td class="sub2">Write the new workspace structure into <code>plan_menu_route</code> in the same change (task P0-5).</td></tr>
+        <tr><td class="fn">Role-to-workspace permissions</td><td class="sub2">A workspace shows only if the role can use something inside it; SYSADM bypass is still deferred.</td><td class="sub2">Derive visibility from existing permissions; enforce routes in P5-1 rather than relying on hidden menus.</td></tr>
+        <tr><td class="fn">Drawers and modals on small screens</td><td class="sub2">A right pane does not fit a phone or narrow tablet.</td><td class="sub2">Same component renders as a bottom sheet under a width breakpoint (P0-2, P5-3).</td></tr>
+        <tr><td class="fn">Live calls must not drop</td><td class="sub2">Opening an action must never leave the call room (the care-team overlay already proved this).</td><td class="sub2">Every in-call action is an overlay or drawer, never a route change.</td></tr>
+        <tr><td class="fn">Old and new UI running together</td><td class="sub2">Staff need a safe way back during rollout.</td><td class="sub2">Per-app <code>workflow_ui</code> flag (P0-3) and redirects from old routes (P1-9).</td></tr>
+        <tr><td class="fn">Each phase needs a redeploy</td><td class="sub2">Deployed builds lag local changes; the front-end and API deploy separately.</td><td class="sub2">Treat each phase exit as a release with its own smoke test (P5-4).</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="appgrp">
+    <h3>Success measures</h3>
+    <div class="tblwrap"><table>
+      <thead><tr><th>Task</th><th>Page transitions today</th><th>Target</th></tr></thead>
+      <tbody>
+        <tr><td class="fn">Reception: walk-in, register, book, bill, pay</td><td class="sub2">8 or more</td><td class="sub2">1 workspace, 0 route changes</td></tr>
+        <tr><td class="fn">Doctor: open visit, write up, prescribe, certify</td><td class="sub2">6 or more</td><td class="sub2">1 workspace, tabs only</td></tr>
+        <tr><td class="fn">Patient: book and prepare for a visit</td><td class="sub2">6 or more</td><td class="sub2">1 guided flow</td></tr>
+        <tr><td class="fn">Finance: find unpaid bill, collect, receipt</td><td class="sub2">4 to 5</td><td class="sub2">1 workspace, drawer</td></tr>
+        <tr><td class="fn">Quality: take a complaint to closure</td><td class="sub2">3 to 4</td><td class="sub2">1 queue, drawer</td></tr>
+        <tr><td class="fn">Top-level menu entries per person</td><td class="sub2">19 to 75 by role</td><td class="sub2">1 to 3 workspaces</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note"><b>Baseline first.</b> Task P0-4 records today's transition counts before anything changes, so the “after” numbers in P5-4 are a real comparison.</div>
+  </div>
+</div>
+
+<footer><div class="wrap">Care Gate / JuliaCare — workflow UX direction. Inventory taken from the live apps (Patient, Doctor, Web menuRoutes). Patterns are proposals to validate per screen, not a final build spec.</div></footer>
+
+<script>
+  (function(){
+    var t = document.getElementById('tgl');
+    function cur(){ try { return localStorage.getItem('cg-theme'); } catch(e){ return null; } }
+    function apply(m){ if(m){ document.documentElement.setAttribute('data-theme', m); } else { document.documentElement.removeAttribute('data-theme'); } }
+    apply(cur());
+    t.addEventListener('click', function(){
+      var isDark = document.documentElement.getAttribute('data-theme') === 'dark'
+        || (!document.documentElement.hasAttribute('data-theme') && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      var next = isDark ? 'light' : 'dark'; apply(next);
+      try { localStorage.setItem('cg-theme', next); } catch(e){}
+    });
+    // Tabs
+    var tabs = [['t-cov','p-cov','#audit'],['t-impl','p-impl','#plan'],['t-dev','p-dev','#dev']];
+    function sel(id){
+      tabs.forEach(function(trip){
+        var btn = document.getElementById(trip[0]), pan = document.getElementById(trip[1]);
+        var on = trip[0] === id; btn.setAttribute('aria-selected', on ? 'true':'false'); pan.hidden = !on;
+        if (on) { try { history.replaceState(null,'', trip[2]); } catch(e){} }
+      });
+    }
+    tabs.forEach(function(trip){ document.getElementById(trip[0]).addEventListener('click', function(){ sel(trip[0]); }); });
+    tabs.forEach(function(trip){ if (location.hash === trip[2]) sel(trip[0]); });
+
+    // ---------- Development tracker ----------
+    var PHASES = [
+      { id:'P0', name:'Foundation', goal:'Agree the structure, build the shared components, and capture the baseline before anything changes.' },
+      { id:'P1', name:'Regroup navigation', goal:'Re-nest today’s menus into role workspaces and Setup. No new screens, so the risk is low and the gain is immediate.' },
+      { id:'P2', name:'Worklist as home', goal:'Each role lands on its queue of real work instead of a menu. Reuses the lists that already exist.' },
+      { id:'P3', name:'Inline actions', goal:'Turn the most repeated open-screen, act, go-back paths into drawers, modals and tabs so people keep their place.' },
+      { id:'P4', name:'Guided flows', goal:'Collapse the multi-screen journeys into single guided flows with a progress trail.' },
+      { id:'P5', name:'Harden and roll out', goal:'Enforce permissions, finish Arabic and accessibility, test the key tasks against the baseline, pilot, then retire the old routes.' }
+    ];
+    var TASKS = [
+      ['P0-1','P0','All','Sign off the workspace list and the role-to-workspace map (from the Coverage tab)',2],
+      ['P0-2','P0','All','Shared UI kit in Applications/shared: workspace shell, worklist lane, right drawer, modal, bottom sheet, persistent bar',8],
+      ['P0-3','P0','All','Per-app workflow_ui feature flag so old and new navigation run side by side',2],
+      ['P0-4','P0','All','Baseline: instrument the router and record page transitions for the six key tasks',3],
+      ['P0-5','P0','All','Keep the workspace structure regeneration-proof: a hand-written overlay per app plus a test that fails if a generated route is unplaced or stale',3],
+      ['P0-6','P0','All','Workspace visibility from existing permissions (show a workspace if the role can use one of its own routes, plus any extra RBAC grant)',3],
+
+      ['P1-1','P1','Patient','Bottom bar becomes Get care, My care, Messages, Me',3],
+      ['P1-2','P1','Patient','My care workspace: tabs over the existing screens (visits, certificates, referrals, bills, records), with record sub-screens as chips',5],
+      ['P1-3','P1','Patient','Me and family workspace: profile first, then family, consents, contacts, privacy, complaints and help as tabs',4],
+      ['P1-4','P1','Doctor','Navigation becomes Worklist, Patients, Messages, Me',2],
+      ['P1-5','P1','Doctor','Me workspace: profile, availability, leave, devices, licence, ratings, statistics and sync as tabs',4],
+      ['P1-6','P1','Web','Role-scoped left navigation by workspace with a workspace picker for multi-role staff',5],
+      ['P1-7','P1','Web','Move the roughly 18 configuration menus under a searchable Setup area',4],
+      ['P1-8','P1','All','Arabic and Kurdish labels for every new workspace and tab name',2],
+      ['P1-9','P1','All','Redirect every old route to its new home so bookmarks and deep links keep working',2],
+
+      ['P2-1','P2','Doctor','Unified Worklist with lanes: Today, Caseload, Emergency, MHPSS, To review, Referrals, Messages, with count badges',8],
+      ['P2-2','P2','Doctor','Right-pane peek for a worklist item; Open expands to the consult workspace',3],
+      ['P2-3','P2','Web','Front Desk worklist with patient search as the spine and inline register',6],
+      ['P2-4','P2','Web','Finance worklist: outstanding, receipts, payments, refunds, reconciliation lanes',6],
+      ['P2-5','P2','Web','Scheduling and queues workspace: calendar, appointments, emergency, MHPSS',6],
+      ['P2-6','P2','Web','Care Quality and Safeguarding queue: complaints, feedback, safeguarding, reports tab',5],
+      ['P2-7','P2','Web','Referrals inbox with unanswered and SLA-breached items first',3],
+      ['P2-8','P2','Web','Governance and Security workspace: users, alerts, requests, audit and reference tabs',6],
+      ['P2-9','P2','Web','Insights landing with tabbed reports and health cards (delivery, SMS, sync)',5],
+
+      ['P3-1','P3','Web','Patient card drawer: book, create bill, take payment, receipt without leaving the card',8],
+      ['P3-2','P3','Web','Persistent cashier bar for open and close shift; day-end summary as a modal',4],
+      ['P3-3','P3','Web','Register and merge duplicate patients as modals',4],
+      ['P3-4','P3','Web','Quality and referral actions in drawers: assign, respond, set status',5],
+      ['P3-5','P3','Web','Governance actions inline with confirm: acknowledge, unlock, approve, verify',3],
+      ['P3-6','P3','Web','Setup catalogues: add and edit each item in a modal',5],
+      ['P3-7','P3','Doctor','Consult workspace: case sheet, diagnosis, prescription, certificate and vitals as tabs; care team and refer as drawers',8],
+      ['P3-8','P3','Patient','Sheets and modals for upload, consent, family switch and complaint',4],
+
+      ['P4-1','P4','Patient','Get care flow: symptoms, path, match, slot, confirm, optional visit prep',10],
+      ['P4-2','P4','Patient','Onboarding flow including the minor and guardian branch',5],
+      ['P4-3','P4','Patient','Pay a bill as a short flow or sheet from the Bills tab',3],
+      ['P4-4','P4','Web','Guided full registration with minor, guardian and consent branches',4],
+      ['P4-5','P4','All','Triage to match to consult as one continuous flow',6],
+
+      ['P5-1','P5','All','Enforce permissions on workspace and tab routes, not only by hiding menus',4],
+      ['P5-2','P5','All','Arabic right-to-left and accessibility pass: focus order, Escape, labels on drawers and modals',5],
+      ['P5-3','P5','All','Narrow-screen pass: drawers become bottom sheets under the breakpoint',4],
+      ['P5-4','P5','All','End-to-end tests for the six key tasks; compare transitions with the baseline',5],
+      ['P5-5','P5','All','Pilot each role behind the flag, collect feedback, fix',7],
+      ['P5-6','P5','All','Remove retired routes, update the hidden-menus register and docs, train staff',3]
+    ];
+    var STATUS = { todo:'Not started', doing:'In progress', review:'In review', blocked:'Blocked', done:'Done' };
+
+    // ---- Source of truth: updated in this file as work lands ----
+    // s = status, o = owner, n = note shown under the task.
+    var FILE = {
+      'P0-1': { s:'done',  o:'Claude', n:'Go-ahead given. The map is provisional: P0-6 checks it against real role permissions.' },
+      'P0-2': { s:'done',  o:'Claude', n:'Built in Applications/shared/components: WorkPane (side pane wide, bottom sheet narrow), WorkspaceTabs (lanes and tabs with counts), WorkspaceShell (title, actions, sticky persistent-bar slot, tabs), WorklistRow. Zero type errors in all three apps; markup, ARIA and slot behaviour covered by tests. Not yet exercised in a real browser: the narrow-screen sheet switch, focus trap and arrow-key focus. They get checked the first time a workspace uses them (P2-1).' },
+      'P0-3': { s:'done',  o:'Claude', n:'The three flags are live in the database (workflow_ui_web, _doctor, _patient, all off; verified through sp_appconfig_flags, and re-running the SQL changes nothing). Each app shell reads its flag and stamps data-workflow-ui="on|off" on its root, so Phase 1 has one hook. Nothing changes visually while a flag is off. To pilot: turn the flag on for one facility in Settings.' },
+      'P0-4': { s:'doing', o:'Claude', n:'Counter built, installed in all three apps and tested; it stores route names or patterns only, never concrete URLs (a test failed when I put the leak back). Remaining: record the six baselines. In the browser console run __afdFlow.start("name"), do the task, run __afdFlow.end(), repeat 3 times, then __afdFlow.report() and paste it here. Names: frontdesk.walkin-pay (find or register a patient, book, bill, pay), doctor.visit-writeup (open a visit, write up, prescribe, certify), patient.book-prepare (book and add the symptom check), finance.collect-unpaid (find an unpaid bill, collect, receipt), quality.complaint-closure (take a complaint to closed), and menu.entries (count the sidebar entries each role sees; not a transition count).' },
+      'P0-5': { s:'done',  o:'Claude', n:'Re-scoped. The plan database in this checkout is a 0-byte gitignored placeholder, so nothing here can regenerate menuRoutes.ts or write to plan_menu_route. Instead each app has a hand-written core/workspaces.ts the generator never touches, joined to the generated menu by shared/composables/workspaceMap.ts. Three tests fail if a route is unplaced, stale or owned twice; each was proven by simulating that regeneration problem.' },
+      'P0-6': { s:'done',  o:'Claude', n:'visibleWorkspaces(role, extraGrants) shows a workspace when the role can use one of its own routes, using the role lists already on the menu plus the RBAC grants the web shell already loads. No second permission model. Tested per role (cashier, doctor, counsellor, patient, unknown role, extra grant). SYSADM sees only four web workspaces today because few routes list it; that matches the deferred super-admin item and is not changed here.' },
+      'P1-1': { s:'review', o:'Claude', n:'Flag on: the patient bottom bar is Get care, My care, Messages, Me (four entries, the most the bar shows), keyed by workspace so the active one highlights on detail screens too. Flag off: the original bar and More sheet run unchanged. Type-check, build and tests pass; not seen in a browser.' },
+      'P1-2': { s:'review', o:'Claude', n:'Re-scoped from a hub page to a workspace bar. Embedding existing screens would have bypassed their route guards, flag gates and consent gate, and the router file is generated. Instead every tab is a real route: Visits, Certificates, Referrals, Bills, Records, with Records sub-screens (Conditions, Vitals, Documents, Readings, Upload) as chips. This also makes those sub-screens reachable, which they were not before.' },
+      'P1-3': { s:'review', o:'Claude', n:'Me and family opens on My profile (a real screen that is not a menu entry, added as an extra tab), then Family, Contacts, Notifications, Consents, Privacy, Complaints and Help. Delete account stays in the same workspace.' },
+      'P1-4': { s:'review', o:'Claude', n:'Flag on: the doctor bar is Worklist, Patients, Messages, Me. Counsellors get Worklist and Me only (they have no patients or messages screens). Every queue is a Worklist tab: My Day, Consultations, Emergency, MHPSS queue and caseload, readings to review, referrals, prescriptions. Flag off: unchanged.' },
+      'P1-5': { s:'review', o:'Claude', n:'The Me workspace opens on the profile, with availability, leave, devices, licence, ratings, statistics and sync as tabs.' },
+      'P1-6': { s:'review', o:'Claude', n:'Flag on: the sidebar is one entry per workspace (an administrator gets at most ten, and the avatar menu keeps account screens), each opening on its existing hub where there is one (Billing, Quality, Scheduling, Clinical). The screens inside are tabs in a bar above the page. All real routes, so guards and flags still run. Flag off: the original sidebar, untouched. Remaining for sign-off: a visual pass with the flag on.' },
+      'P1-7': { s:'review', o:'Claude', n:'Setup is a workspace with 15 tabs, so its bar shows a filter box (it appears once a workspace has more than 8 tabs). The localisation, content and key-registry screens are already hidden in the menu and stay so.' },
+      'P1-8': { s:'doing', o:'Claude', n:'Arabic names exist for every workspace in all three overlays, and tests check they are non-empty; tab labels come from the menu, which already has Arabic for the patient app. Kurdish is still owed (needs a translator, not guesswork). The filter box placeholder and its no-match message are English-only for now.' },
+      'P1-9': { s:'done', o:'Claude', n:'Nothing to redirect: every tab and landing is an existing route and no route moved. A test checks each tab against the router. This task becomes real only if a later phase moves a screen.' },
+      'P3-7': { s:'doing', o:'Claude', n:'First real use of WorkPane: the care team in the call room is the shared side pane (bottom sheet on a phone); the room stays mounted so the call never drops. WorkPane now also locks page scroll and restores it. Other consult tabs remain routes.' },
+      'P5-1': { s:'doing', o:'Claude', n:'Built in shadow mode only: it records which URLs the menu role lists WOULD block (route patterns and roles, never ids) and never blocks anything (console: __afdRouteAccess.report()). Offline audit of the real routers: about 121 routes are unrestricted at the guard, and 77 of them would block at least one role under menu-role enforcement. Most are staff roles opening patient-app screens, which is arguably right. The real conflict is CNS in the doctor app: it would be blocked from /consultations and /patients, and CNS is both "counsellor" and a consulting clinician (the care-team flow we tested relies on it). Enforcement waits for a decision on CNS and a review of the menu role lists.' },
+      'P4-5': { s:'review', o:'Claude', n:'Triage to match to book now carries the intake through (the book screen knows the symptom check was done). Known gap: the intake is not linked to the new appointment (no link call checked), so the doctor does not see it for a match-led booking.' },
+      'P4-3': { s:'review', o:'Claude', n:'Pay checkout took the bill id from the wrong place and redirected to a dead result route; fixed to read the route param and land on /billing/pay/result. Type-checks and builds; not run against a payment provider.' },
+      'P4-1': { s:'doing', o:'Claude', n:'Get care starts on Home, which already is the chooser (urgent, book, find a doctor, check symptoms, talk to someone), so no new /get-care page. Chain fixed: a red-flag intake now offers Get urgent help now first (it was ignored); Done on a visit-prep intake goes to that appointment; the visit-prep offer is not repeated after a symptom-led booking.' },
+      'P3-4': { s:'todo', o:'Claude', n:'Not built. Referral respond and complaint assign payloads need checking against the stored procedures first.' },
+      'P3-3': { s:'todo', o:'Claude', n:'Not built. Register is a guided full-page flow with guardian/minor/consent branches; moving it into a modal risks that flow.' },
+      'P3-2': { s:'todo', o:'Claude', n:'Not built. Needs the shift list endpoint checked and a persistent bar in the web shell; not safe to ship unseen because it touches cash handling.' },
+      'P3-1': { s:'todo', o:'Claude', n:'Not built. The booking and bill forms do not read a patient from the URL, so Book / Create bill from a card would need those generated forms changed first. Needs a decision, and a browser to check.' },
+      'P2-9': { s:'doing', o:'Claude', n:'Insights opens on the Dashboard. Delivery/SMS/sync health cards not added.' },
+      'P2-8': { s:'review', o:'Claude', n:'Governance opens on Security alerts with a badge for Active alerts (first 100). Users, requests, audit and reference stay as tabs.' },
+      'P2-7': { s:'review', o:'Claude', n:'Referrals opens on the referral list with a badge for the unanswered set (the same list the screen shows).' },
+      'P2-6': { s:'review', o:'Claude', n:'Quality opens on Complaints, with a badge for open complaints (not Resolved/Closed/Rejected). Count is capped by the first 100 rows the list returns. Tested, not seen in a browser.' },
+      'P2-5': { s:'doing', o:'Claude', n:'Scheduling keeps its hub as landing; the workspace tabs are the existing calendar, appointment and queue screens. No counts added.' },
+      'P2-4': { s:'doing', o:'Claude', n:'Finance now opens on Outstanding bills (the work queue) instead of the Billing hub; tabs are the existing screens. Per-lane counts not built: no list endpoint defines "waiting" yet.' },
+      'P2-3': { s:'doing', o:'Claude', n:'Front Desk now opens on the patient list. Patient edit is already a dialog. Inline register is not built (see P3-3).' },
+      'P2-2': { s:'todo', o:'Claude', n:'Not built. A row peek over My Day / the queues means editing live list screens; needs your review of the counts first. WorkPane is ready for it.' },
+      'P2-1': { s:'review', o:'Claude', n:'Re-scoped. Not a new page: My Day already is the worklist (emergency banner, today/upcoming split), so a second page would duplicate and disagree with it. Instead the Worklist tabs and the bottom-bar entry carry live counts: emergency queue, referrals waiting, readings to review, support queue. Each count copies the filter of the screen it opens (emergency = Requested + unassigned + instant/urgent, same as My Day). A failed fetch gives no badge, never 0. 7 tests. Not seen in a browser.' }
+    };
+    var FINDINGS = [
+      ['The web app already has workspaces', 'Seven workspace views exist: Audit, Billing, Clinical, Quality, Notifications, RBAC, Scheduling. AppShell.vue already hides module screens inside them and moves account screens to the user menu.', 'The “75 menus today” figure overstated what people see. Web work is finishing and role-scoping existing hubs, so several Phase 1 to 3 web tasks are smaller than estimated. P0-4 measures the real visible count per role before any claim is made.'],
+      ['Rollout flags need the opposite default to kill-switches', 'The flag store fails open (unknown means on). For a rollout flag that would move people onto an unfinished UI whenever the flag request failed.', 'workflow_ui_* flags are opt-in: off by default, on only when the server says so. Built as featureFlags.isEnabled.'],
+      ['The database needs the VPN', 'From a normal network the host 172.16.16.200:5432 times out. With the SonicWall VPN connected it answers.', 'Keep the VPN on for any task that touches the database. The flag SQL was applied once it was up.'],
+      ['A metrics instrument almost recorded patient ids', 'useFlowMetrics stored the concrete URL for unnamed routes, e.g. /patients/392/360. A new test failed when the leak was reinstated, so it is guarded.', 'Fixed: it keeps the route name or pattern only. Treat any new measurement code as personal-data-adjacent and test what it stores.'],
+      ['Enforcing menu roles blindly would lock people out', 'About 121 routes have no role restriction at the guard. Enforcing the menu role lists would block 77 of them for at least one role, including CNS in the doctor app, whose consulting-clinician use (the care-team flow) is not reflected in the menu.', 'P5-1 runs in shadow mode (records, never blocks). Decision needed: what CNS may open in the doctor app. Then fix the menu role lists and switch enforcement on.'],
+      ['Phases 2 to 4 change existing screens', 'Worklist counts, row drawers and guided flows all modify screens that are live today, and none of it can be seen rendered from this setup.', 'Held until you have reviewed Phase 1 with the flags on. Each remaining task needs the screen it touches read first, and a regression check in a browser.'],
+      ['Hub pages would have bypassed the guards', 'Embedding existing screens inside a hub skips the route guards (role, feature flag, consent), and the router file is marked generated so new routes there would be lost on regeneration.', 'Navigation is a workspace bar of real routes instead. Guards, flags, consent and deep links all behave as before, with no router edits. Tests check that every tab exists in the router.'],
+      ['The first nav tests caught two real bugs', 'A tab pointed at /consult/urgent, which is really /consult/urgent/:id and would have been a broken tab; and the doctor "Me" opened on Availability, not the profile.', 'Added notTabs (flow result screens are never tabs) and a landing for the doctor Me workspace. Mutation test confirmed the guard fails without the fix.'],
+      ['The plan database is not in this checkout', 'atlas/afd_plan.db is a 0-byte, gitignored file here, so the generator cannot run from this machine. menuRoutes.ts says it is emitted from that database and must not be edited.', 'The workspace structure lives in hand-written overlay files instead, guarded by tests. It also means regeneration happens elsewhere; ask who holds the real plan database before any regeneration.'],
+      ['My first audit counted wrongly', 'The live menu has 72 web, 19 doctor and 35 patient entries, 126 in all. My regex read through commented-out routes (Content & Translations, Languages, Translatable fields, Translation Gaps, Report Catalogue, Encryption Keys) and missed five live ones (the Billing, Quality and Scheduling hubs, Complaints, Medical Certificates).', 'Counts on the Coverage tab are corrected. The placement test now holds the real list, so this cannot drift again.'],
+      ['Type-checking had been silently skipped', 'Three type errors in the doctor app (vitals work) had gone unnoticed because Vite does not type-check.', 'Fixed. All three apps now pass vue-tsc with zero errors, so later phases have a clean baseline to compare against.'],
+      ['Several buttons sent people to routes that do not exist', 'Billing shift open/close, refund and receipt screens, and the payment lists redirected to paths missing from the router, so after saving the user landed on a not-found page. The patient pay screen also read the bill id from the wrong place.', 'Fixed in the web and patient apps (redirects now point at real routes; Pay checkout reads the route param). Found by the new route tests, not by users.'],
+      ['The alert badge undercounted', 'The web alert badge fetched a short page, so it stopped at the page size.', 'Fetch raised to 100. Counts for complaints and alerts are still capped by the first 100 rows the list returns; an exact count needs a count endpoint.'],
+      ['A symptom-check red flag was ignored', 'The intake result carried isRedFlag but nothing read it: a patient who reported chest pain with breathlessness was shown a normal list of doctors.', 'Intake now offers Get urgent help now first. Please test with a red-flag symptom set.'],
+      ['Match-led bookings are not linked to the intake', 'The doctor chosen from a match opens the book screen without the symptom intake, and no link call was checked.', 'The visit-prep offer is no longer repeated. Linking the intake to the appointment is still open.']
+    ];
+    var LOG = [
+      ['2026-10-01', 'Phase 0 started. Added WorkPane, useWorkflowUi, useFlowMetrics, the opt-in flag getter and the workflow flag SQL. Installed the transition counter in all three apps. Fixed three doctor-app type errors. Web, doctor and patient apps pass vue-tsc with zero errors.'],
+      ['2026-10-01', 'Tracker converted to be file-driven, with findings and this log. Code audit showed the web app already has seven workspaces; plan notes updated.'],
+      ['2026-10-01', 'P5-1 built in shadow mode (never blocks) plus an offline audit of the real routers; care team in the call room moved onto the shared WorkPane (P3-7 started). Counts for the Worklist (P2-1) deliberately held: they would disagree with the lists they open. 82 tests pass; all three apps pass the type-check and production build.'],
+      ['2026-10-01', 'Phase 1 built behind the flags: one entry per workspace in the web sidebar, the four-entry patient and doctor bottom bars, and a shared workspace bar of real routes above each page (filter box for long workspaces, chips for sub-screens). 73 tests pass, including that every tab exists in the router; all three apps pass the type-check and a production build. Replaced the interim sidebar regrouping. Statuses are In review, not Done: nothing here has been seen in a browser.'],
+      ['2026-10-01', 'P1-6 first slice: the web sidebar regroups by workspace when workflow_ui_web is on (legacy path untouched when off). Type-check and production build pass; 36 workspace tests including the grouping. Browser verification is not possible from this setup, so appearance still needs your review with the flag on. Patient and doctor navigation (P1-1, P1-4) wait on the screens they point to (P1-2, P1-3, P1-5, P2-1).'],
+      ['2026-10-01', 'P0-5 and P0-6 done (P0-5 re-scoped: the plan database is absent here, so a hand-written overlay plus tests replaces writing into it). Workspace overlays added for web (10), doctor (3) and patient (4); 46 tests pass; each guard was proven by simulating a regeneration problem. Audit counts corrected to 126 live menu entries. Phase 0 is down to P0-4: record the six baselines.'],
+      ['2026-10-01', 'VPN connected. Workflow flags applied to the live database and verified. Each app shell now stamps data-workflow-ui. Shared kit finished: WorkspaceTabs, WorkspaceShell, WorklistRow added to WorkPane. 14 tests added; all three apps pass the type-check. Fixed an id leak in the transition counter. P0-2 and P0-3 done.'],
+      ['2026-10-01', 'Phases 2 to 4 built as far as is safe unseen. Web: live counts on Quality, Governance and Referrals plus work-queue landings. Doctor: live counts on the Worklist tabs and bottom bar. Patient: red-flag intake, visit-prep and booking chain fixes. Bugs fixed on the way: dead redirects in billing/payments, patient Pay checkout, alert badge cap. Not built (needs decisions or a browser): P3-1 to P3-4, P2-2. All three apps pass vue-tsc and vite build; workflow tests pass (92 web, 7 doctor). Nothing has been seen in a browser from this setup.']
+    ];
+
+    var KEY = 'cg-workflow-plan-v2';
+    var state = {};   // local overrides only
+    try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch(e){ state = {}; }
+    var saveOk = true;
+    function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){ saveOk = false; document.getElementById('savenote').textContent = 'This browser is blocking storage, so your overrides will be lost on reload. The file status is unaffected.'; } }
+    // Effective value: your local override if you made one, else the file, else not started.
+    function get(id){
+      var f = FILE[id] || {}, l = state[id];
+      return { s: (l && l.s) || f.s || 'todo', o: (l && l.o !== undefined) ? l.o : (f.o || ''), n: f.n || '', local: !!(l && l.s && l.s !== (f.s || 'todo')) };
+    }
+    function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+    function counts(list){ var c={todo:0,doing:0,review:0,blocked:0,done:0,days:0,doneDays:0,builtDays:0}; list.forEach(function(t){ var s=get(t[0]).s; c[s]++; c.days+=t[4]; if(s==='done') c.doneDays+=t[4]; if(s==='done'||s==='review') c.builtDays+=t[4]; }); return c; }
+    // Progress counts work that is BUILT (done + in review); 'accepted' counts only what you have signed off.
+    function pct(c, n){ return n ? Math.round((c.builtDays / Math.max(1,c.days)) * 100) : 0; }
+    function pctAccepted(c){ return c.days ? Math.round((c.doneDays / c.days) * 100) : 0; }
+
+    function renderSummary(){
+      var c = counts(TASKS), p = pct(c, TASKS.length);
+      document.getElementById('devbadge').textContent = p + '%';
+      document.getElementById('sumcards').innerHTML =
+        '<div class="c"><div class="n">'+p+'%</div><div class="k">Built, weighted by effort ('+pctAccepted(c)+'% signed off)</div></div>'+
+        '<div class="c"><div class="n s-done">'+c.done+'</div><div class="k">Done and signed off, of '+TASKS.length+' tasks</div></div>'+
+        '<div class="c"><div class="n s-review">'+c.review+'</div><div class="k">Built and tested, waiting for your review</div></div>'+
+        '<div class="c"><div class="n s-doing">'+c.doing+'</div><div class="k">In progress</div></div>'+
+        '<div class="c"><div class="n s-blocked">'+c.blocked+'</div><div class="k">Blocked</div></div>'+
+        '<div class="c"><div class="n">'+(c.days-c.builtDays)+'</div><div class="k">Working days still to build</div></div>';
+    }
+
+    function renderPhases(){
+      var fa = document.getElementById('f-app').value, fs = document.getElementById('f-st').value;
+      var html = '';
+      PHASES.forEach(function(ph){
+        var all = TASKS.filter(function(t){ return t[1] === ph.id; });
+        var shown = all.filter(function(t){ return (!fa || t[2] === fa) && (!fs || get(t[0]).s === fs); });
+        var c = counts(all), p = pct(c, all.length);
+        html += '<section class="phase" aria-label="'+esc(ph.id+' '+ph.name)+'">'+
+          '<div class="phase-h"><span class="pid">'+ph.id+'</span><h3>'+esc(ph.name)+'</h3>'+
+          '<span class="meta">'+c.done+' done, '+c.review+' in review of '+all.length+' · '+p+'% built · '+c.days+' days</span>'+
+          '<p class="goal">'+esc(ph.goal)+'</p></div>'+
+          '<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+p+'" aria-label="'+esc(ph.name)+' progress"><i style="inline-size:'+p+'%"></i></div>';
+        if (!shown.length) html += '<div class="task"><div class="tt"><span class="est">No tasks match the current filters.</span></div></div>';
+        shown.forEach(function(t){
+          var st = get(t[0]);
+          html += '<div class="task" data-s="'+st.s+'">'+
+            '<div class="tt"><b>'+esc(t[3])+'</b><div class="m"><span class="id">'+t[0]+'</span><span class="app-tag">'+esc(t[2])+'</span><span class="est">'+t[4]+' d</span>'+(st.local?'<span class="est" title="You changed this status in your browser; the file says something else">● local override</span>':'')+'</div>'+(st.n?'<p class="tnote">'+esc(st.n)+'</p>':'')+'</div>'+
+            '<div><label class="sr" for="s-'+t[0]+'" style="position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0)">Status of '+t[0]+'</label>'+
+            '<select id="s-'+t[0]+'" class="st" data-id="'+t[0]+'">'+Object.keys(STATUS).map(function(k){ return '<option value="'+k+'"'+(st.s===k?' selected':'')+'>'+STATUS[k]+'</option>'; }).join('')+'</select></div>'+
+            '<div><label for="o-'+t[0]+'" style="position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0)">Owner of '+t[0]+'</label>'+
+            '<input id="o-'+t[0]+'" class="own" data-id="'+t[0]+'" placeholder="Owner" value="'+esc(st.o)+'" maxlength="40"></div>'+
+          '</div>';
+        });
+        html += '</section>';
+      });
+      document.getElementById('phases').innerHTML = html;
+    }
+
+    document.getElementById('phases').addEventListener('change', function(e){
+      var el = e.target; if (!el.dataset || !el.dataset.id) return;
+      var id = el.dataset.id;
+      if (el.tagName === 'SELECT') { var cur = state[id] || {}; cur.s = el.value; state[id] = cur; save(); renderSummary(); renderPhases(); var again = document.getElementById('s-'+id); if (again) again.focus(); }
+    });
+    document.getElementById('phases').addEventListener('input', function(e){
+      var el = e.target; if (!el.dataset || !el.dataset.id || el.tagName !== 'INPUT') return;
+      var cur = state[el.dataset.id] || {}; cur.o = el.value; state[el.dataset.id] = cur; save();
+    });
+    document.getElementById('f-app').addEventListener('change', renderPhases);
+    document.getElementById('f-st').addEventListener('change', renderPhases);
+
+    var resetArmed = false, resetBtn = document.getElementById('b-reset');
+    resetBtn.addEventListener('click', function(){
+      if (!resetArmed) { resetArmed = true; resetBtn.textContent = 'Click again to confirm'; setTimeout(function(){ resetArmed = false; resetBtn.textContent = 'Reset to file status'; }, 3500); return; }
+      state = {}; save(); resetArmed = false; resetBtn.textContent = 'Reset to file status'; renderSummary(); renderPhases();
+    });
+
+    document.getElementById('b-copy').addEventListener('click', function(){
+      var c = counts(TASKS), lines = ['Care Gate workflow redesign — status', 'Overall '+pct(c, TASKS.length)+'% built ('+pctAccepted(c)+'% signed off) · '+c.done+' done · '+c.review+' in review · '+c.doing+' in progress · '+c.blocked+' blocked · '+(c.days-c.builtDays)+' working days still to build', ''];
+      PHASES.forEach(function(ph){
+        var all = TASKS.filter(function(t){ return t[1] === ph.id; }), pc = counts(all);
+        lines.push(ph.id+' '+ph.name+' — '+pc.done+' done, '+pc.review+' in review of '+all.length);
+        all.forEach(function(t){ var s = get(t[0]); if (s.s !== 'done') lines.push('  ['+STATUS[s.s]+'] '+t[0]+' ('+t[2]+') '+t[3]+(s.o ? ' — '+s.o : '')); });
+        lines.push('');
+      });
+      var text = lines.join('\n'), box = document.getElementById('copybox'), ta = document.getElementById('copyta');
+      ta.value = text;
+      function fallback(){ box.hidden = false; ta.focus(); ta.select(); }
+      try { navigator.clipboard.writeText(text).then(function(){ var b=document.getElementById('b-copy'); b.textContent='Copied'; setTimeout(function(){ b.textContent='Copy status summary'; }, 1800); }, fallback); }
+      catch(e){ fallback(); }
+    });
+
+    function renderFindings(){
+      document.getElementById('findings').innerHTML = FINDINGS.map(function(f){
+        return '<tr><td class="fn" style="white-space:normal">'+esc(f[0])+'</td><td class="sub2">'+esc(f[1])+'</td><td class="sub2">'+esc(f[2])+'</td></tr>';
+      }).join('');
+      document.getElementById('progresslog').innerHTML = LOG.slice().reverse().map(function(l){
+        return '<tr><td class="fn">'+esc(l[0])+'</td><td class="sub2">'+esc(l[1])+'</td></tr>';
+      }).join('');
+    }
+    renderFindings(); renderSummary(); renderPhases();
+  })();
+</script>
