@@ -1,0 +1,24 @@
+:root{
+  --cg-cyan:#45CADA;
+  --cg-blue:#5A93CB;
+  --cg-indigo:#4B3F96;
+  --cg-deep:#3E3A8A;
+  --cg-ink:#1F1D4A;
+  --cg-surface:#F5F6FA;
+  --cg-tintCyan:#E8F8FB;
+  --cg-tintIndigo:#EEEDF8;
+  --cg-border:#D6DCEB;
+  --cg-muted:#5B5F7A;
+  --cg-night:#14143A;
+  --cg-white:#FFFFFF;
+  --cg-success:#167A5B;
+  --cg-warning:#9A6700;
+  --cg-danger:#C62F3E;
+  --cg-info:#2B6CB0;
+  --cg-primary:#4B3F96;--cg-primary-hover:#3E3A8A;--cg-primary-pressed:#2F2C6E;--cg-disabled:#C9CCE0;--cg-focus:#45CADA;
+  --cg-gradient:linear-gradient(135deg,#45CADA 0%,#5A93CB 45%,#4B3F96 100%);
+  --cg-gradient-reverse:linear-gradient(135deg,#6FDCEA 0%,#7FA9E0 45%,#9A8FE8 100%);
+  --cg-font:Nunito,'Segoe UI',Calibri,system-ui,sans-serif;--cg-font-ar:'Noto Sans Arabic','Segoe UI',Tahoma,sans-serif;
+  --cg-r-sm:8px;--cg-r-md:12px;--cg-r-lg:16px;--cg-r-xl:24px;
+  --cg-shadow-card:0 1px 2px rgba(31,29,74,.06),0 4px 16px rgba(31,29,74,.06);
+}
